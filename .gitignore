@@ -1,0 +1,19 @@
+# build output
+build/
+*.elf
+*.nro
+*.nacp
+*.nso
+*.npdm
+*.map
+*.d
+
+# local/dev only
+.commandcode/
+tools/dev_server_data/
+__pycache__/
+*.pyc
+
+# OS junk
+.DS_Store
+Thumbs.db
