@@ -15,6 +15,15 @@ std::string format(const char *fmt, ...) {
     return std::string(buf);
 }
 
+std::string format(const std::string &fmt, ...) {
+    char buf[2048];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt.c_str(), ap);
+    va_end(ap);
+    return std::string(buf);
+}
+
 std::string trim(const std::string &s) {
     size_t b = s.find_first_not_of(" \t\r\n");
     if (b == std::string::npos) return std::string();

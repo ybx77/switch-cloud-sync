@@ -11,6 +11,7 @@ build/
 # local/dev only
 .commandcode/
 tools/dev_server_data/
+server/data/
 __pycache__/
 *.pyc
 

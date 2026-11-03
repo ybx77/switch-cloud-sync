@@ -97,6 +97,9 @@ bool Config::load(std::string *err) {
     playtime_enabled = asBool(get(kv, "playtime.enabled", "1"));
     playtime_detailed = asBool(get(kv, "playtime.detailed", "1"));
 
+    language = util::toLower(util::trim(get(kv, "app.language", "auto")));
+    if (language != "zh" && language != "en") language = "auto";
+
     return true;
 }
 
@@ -141,6 +144,9 @@ bool Config::save(std::string *err) const {
     text += util::format("enabled = %s\n", b(playtime_enabled));
     text += "# 1 = 同时上传详细游玩事件（启动/退出/焦点/账号切换）\n";
     text += util::format("detailed = %s\n", b(playtime_detailed));
+    text += "\n[app]\n";
+    text += "# auto / zh / en\n";
+    text += "language = " + language + "\n";
 
     if (!util::writeFile(SD_CONFIG, text)) {
         if (err) *err = util::format("cannot write %s", SD_CONFIG);

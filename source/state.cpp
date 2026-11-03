@@ -67,11 +67,18 @@ bool State::init(std::string *err) {
         for (size_t i = 0; i < lines.size(); ++i) {
             if (util::startsWith(lines[i], "last_sync=")) {
                 last_sync_ = util::trim(lines[i].substr(strlen("last_sync=")));
+            } else if (util::startsWith(lines[i], "server_id=")) {
+                server_id_ = util::trim(lines[i].substr(strlen("server_id=")));
             }
         }
     }
 
     return true;
+}
+
+void State::clearIndexes() {
+    saves_.clear();
+    album_.clear();
 }
 
 bool State::getSaveEntry(const std::string &title_id, const std::string &user_id,
@@ -135,7 +142,7 @@ bool State::flush(std::string *err) {
         return false;
     }
 
-    std::string meta = "last_sync=" + last_sync_ + "\n";
+    std::string meta = "last_sync=" + last_sync_ + "\nserver_id=" + server_id_ + "\n";
     util::writeFile(SD_STATE_META, meta);
     return true;
 }

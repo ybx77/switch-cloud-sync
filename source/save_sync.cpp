@@ -1,9 +1,11 @@
+#include "i18n.hpp"
 #include "save_sync.hpp"
 
 #include <unistd.h>
 
 #include "log.hpp"
 #include "saves.hpp"
+#include "server_identity.hpp"
 #include "sha256.hpp"
 #include "state.hpp"
 #include "titles.hpp"
@@ -40,9 +42,9 @@ void splitTab(const std::string &line, size_t max_fields, std::vector<std::strin
 }
 
 std::string httpError(long status) {
-    if (status == 401 || status == 403) return util::format("HTTP %ld（检查 token）", status);
-    if (status == 404) return util::format("HTTP 404（端点不存在或没有数据）");
-    if (status == 413) return "HTTP 413（超过服务端体积限制）";
+    if (status == 401 || status == 403) return util::format(T("HTTP %ld（检查 token）"), status);
+    if (status == 404) return util::format(T("HTTP 404（端点不存在或没有数据）"));
+    if (status == 413) return T("HTTP 413（超过服务端体积限制）");
     return util::format("HTTP %ld", status);
 }
 
@@ -60,7 +62,7 @@ bool findLocalSave(const RemoteSave &remote, SaveEntry *out, std::string *err) {
             return true;
         }
     }
-    if (err) *err = "本地没有对应的存档（游戏未安装或用其他用户）";
+    if (err) *err = T("本地没有对应的存档（游戏未安装或用其他用户）");
     return false;
 }
 
@@ -70,16 +72,19 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
                     SyncStats *stats, std::string *err) {
     *stats = SyncStats();
     if (!cfg.saves_enabled) {
-        if (err) *err = "设置里已关闭存档上传";
+        if (err) *err = T("设置里已关闭存档上传");
         return false;
     }
 
     std::vector<SaveEntry> all;
     if (!enumerateSaves(&all, err)) return false;
 
+    // If the server database was replaced, forget the local "already uploaded" index.
+    syncServerIdentity(cfg, http, state);
+
     std::string title_err;
     if (!titles.ensureLoaded(&title_err)) {
-        Log::printf("警告: %s（游戏名会缺失）", title_err.c_str());
+        Log::printf(T("警告: %s（游戏名会缺失）"), title_err.c_str());
     }
 
     std::vector<SaveEntry> list;
@@ -89,10 +94,10 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
     }
 
     stats->total = (int)list.size();
-    Log::printf("找到 %u 个存档（过滤后 %u 个）", (unsigned)all.size(), (unsigned)list.size());
+    Log::printf(T("找到 %u 个存档（过滤后 %u 个）"), (unsigned)all.size(), (unsigned)list.size());
     if (list.empty()) return true;
 
-    UI::progressPhase("存档备份", (int)list.size());
+    UI::progressPhase(T("存档备份"), (int)list.size());
 
     const std::string device = effectiveDeviceId(cfg, state);
     const long long max_bytes = (long long)cfg.max_upload_mb * 1024LL * 1024LL;
@@ -100,7 +105,7 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
 
     for (size_t i = 0; i < list.size(); ++i) {
         if (!UI::pump()) {
-            if (err) *err = "已取消";
+            if (err) *err = T("已取消");
             return false;
         }
 
@@ -109,7 +114,7 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
         const std::string user_id = entry.userIdStr();
 
         std::string name = sanitizeText(titles.nameFor(entry.app_id));
-        if (name.empty()) name = "未知游戏";
+        if (name.empty()) name = T("未知游戏");
         UI::progressStep((int)i + 1, name);
 
         // Cheap check first: the save-data commit id changes whenever the game writes it.
@@ -124,7 +129,7 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
 
         if (cfg.only_changed && have_prev && have_extra && prev_commit != 0 &&
             extra.commit_id == prev_commit) {
-            Log::printf("  跳过（未变化）%s", name.c_str());
+            Log::printf(T("  跳过（未变化）%s"), name.c_str());
             ++stats->skipped;
             continue;
         }
@@ -132,7 +137,7 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
         FsFileSystem fs;
         std::string open_err;
         if (!openSaveData(entry, &fs, &open_err)) {
-            Log::printf("  失败 %s: %s", name.c_str(), open_err.c_str());
+            Log::printf(T("  失败 %s: %s"), name.c_str(), open_err.c_str());
             ++stats->failed;
             continue;
         }
@@ -148,13 +153,13 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
         closeSaveData(&fs);
 
         if (!built) {
-            Log::printf("  失败 %s: %s", name.c_str(), build_err.c_str());
+            Log::printf(T("  失败 %s: %s"), name.c_str(), build_err.c_str());
             ++stats->failed;
             continue;
         }
 
         if (raw_bytes > 0) {
-            Log::printf("  压缩 %s → %s（%lld%%）", util::formatBytes(raw_bytes).c_str(),
+            Log::printf(T("  压缩 %s → %s（%lld%%）"), util::formatBytes(raw_bytes).c_str(),
                         util::formatBytes(zip_bytes).c_str(),
                         (long long)(zip_bytes * 100 / (raw_bytes > 0 ? raw_bytes : 1)));
         }
@@ -162,14 +167,14 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
         if (cfg.only_changed && have_prev && prev_sha == sha) {
             // Remember the commit id so next time this save is skipped without reading it.
             if (have_extra) state.setSaveEntry(title_id, user_id, prev_sha, prev_ts, extra.commit_id);
-            Log::printf("  跳过（内容相同）%s", name.c_str());
+            Log::printf(T("  跳过（内容相同）%s"), name.c_str());
             ++stats->skipped;
             unlink(tmp_path.c_str());
             continue;
         }
 
         if (zip_bytes > max_bytes) {
-            Log::printf("  跳过 %s：压缩后 %s 超过上限 %ld MB", name.c_str(),
+            Log::printf(T("  跳过 %s：压缩后 %s 超过上限 %ld MB"), name.c_str(),
                         util::formatBytes(zip_bytes).c_str(), cfg.max_upload_mb);
             ++stats->failed;
             unlink(tmp_path.c_str());
@@ -177,7 +182,7 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
         }
         FileUploadSource src(tmp_path);
         if (!src.ok()) {
-            Log::printf("  失败 %s：无法重新打开备份文件", name.c_str());
+            Log::printf(T("  失败 %s：无法重新打开备份文件"), name.c_str());
             ++stats->failed;
             unlink(tmp_path.c_str());
             continue;
@@ -193,7 +198,7 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
         headers.push_back("X-Content-SHA256: " + sha);
         headers.push_back("X-Device-Name: " + util::urlEncode(cfg.device_name));
 
-        Log::printf("  上传 %s（%s）", name.c_str(), util::formatBytes(zip_bytes).c_str());
+        Log::printf(T("  上传 %s（%s）"), name.c_str(), util::formatBytes(zip_bytes).c_str());
 
         HttpResponse resp;
         std::string http_err;
@@ -201,13 +206,13 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
         unlink(tmp_path.c_str());
 
         if (!ok) {
-            Log::printf("  失败 %s: %s", name.c_str(), http_err.c_str());
+            Log::printf(T("  失败 %s: %s"), name.c_str(), http_err.c_str());
             ++stats->failed;
             if (g_abort || g_exit) break;
             continue;
         }
         if (resp.status < 200 || resp.status >= 300) {
-            Log::printf("  失败 %s: %s", name.c_str(), httpError(resp.status).c_str());
+            Log::printf(T("  失败 %s: %s"), name.c_str(), httpError(resp.status).c_str());
             ++stats->failed;
             continue;
         }
@@ -215,11 +220,11 @@ bool saveSyncUpload(const Config &cfg, HttpClient &http, State &state, TitleCach
         state.setSaveEntry(title_id, user_id, sha, timestamp,
                            have_extra ? extra.commit_id : 0);
         ++stats->uploaded;
-        Log::printf("  完成 %s", name.c_str());
+        Log::printf(T("  完成 %s"), name.c_str());
         if (stats->uploaded % 10 == 0) state.flush();
     }
 
-    state.setLastSync(util::format("存档 %s", util::formatUnixTime(util::nowUnix()).c_str()));
+    state.setLastSync(util::format(T("存档 %s"), util::formatUnixTime(util::nowUnix()).c_str()));
     state.flush();
     return !(g_abort || g_exit);
 }
@@ -273,7 +278,7 @@ bool saveSyncRestore(const Config &cfg, HttpClient &http, State &state, const Re
     util::ensureDir(SD_TMP_DIR);
     const std::string tmp_path = std::string(SD_TMP_DIR) + "/restore.zip";
 
-    UI::progressPhase("下载存档", 1);
+    UI::progressPhase(T("下载存档"), 1);
     std::string url = cfg.api("/saves/latest") + "?device=" +
                       util::urlEncode(effectiveDeviceId(cfg, state)) +
                       "&title_id=" + util::urlEncode(remote.title_id) +
@@ -281,7 +286,7 @@ bool saveSyncRestore(const Config &cfg, HttpClient &http, State &state, const Re
 
     FileDownloadSink sink(tmp_path);
     if (!sink.ok()) {
-        if (err) *err = util::format("无法创建 %s", tmp_path.c_str());
+        if (err) *err = util::format(T("无法创建 %s"), tmp_path.c_str());
         return false;
     }
 
@@ -302,15 +307,15 @@ bool saveSyncRestore(const Config &cfg, HttpClient &http, State &state, const Re
     }
     if (!closed) {
         unlink(tmp_path.c_str());
-        if (err) *err = "写入 SD 卡失败";
+        if (err) *err = T("写入 SD 卡失败");
         return false;
     }
 
-    UI::progressPhase("校验并写入", 1);
+    UI::progressPhase(T("校验并写入"), 1);
     std::string sha = sha256File(tmp_path.c_str());
     if (!remote.sha256.empty() && sha != remote.sha256) {
         unlink(tmp_path.c_str());
-        if (err) *err = util::format("校验失败（本地 %s / 服务器 %s）", sha.c_str(),
+        if (err) *err = util::format(T("校验失败（本地 %s / 服务器 %s）"), sha.c_str(),
                                      remote.sha256.c_str());
         return false;
     }
@@ -332,7 +337,7 @@ bool saveSyncRestore(const Config &cfg, HttpClient &http, State &state, const Re
     if (!UI::pump()) {
         closeSaveData(&fs);
         unlink(tmp_path.c_str());
-        if (err) *err = "已取消";
+        if (err) *err = T("已取消");
         return false;
     }
 
@@ -348,8 +353,8 @@ bool saveSyncRestore(const Config &cfg, HttpClient &http, State &state, const Re
     state.setSaveEntry(remote.title_id, remote.user_id, sha,
                        remote.timestamp > 0 ? remote.timestamp : util::nowUnix(),
                        have_extra ? extra.commit_id : 0);
-    state.setLastSync(util::format("恢复 %s", util::formatUnixTime(util::nowUnix()).c_str()));
+    state.setLastSync(util::format(T("恢复 %s"), util::formatUnixTime(util::nowUnix()).c_str()));
     state.flush();
-    Log::printf("恢复完成: %s", remote.title_id.c_str());
+    Log::printf(T("恢复完成: %s"), remote.title_id.c_str());
     return true;
 }

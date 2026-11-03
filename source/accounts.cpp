@@ -1,3 +1,4 @@
+#include "i18n.hpp"
 #include "accounts.hpp"
 
 #include "log.hpp"
@@ -47,10 +48,10 @@ std::string accountUserName(const AccountUid &uid) {
 }
 
 std::string userIdLabel(const std::string &uid_hex) {
-    if (uid_hex.empty() || uid_hex == "0") return "设备存档";
+    if (uid_hex.empty() || uid_hex == "0") return T("设备存档");
 
     std::string short_id = uid_hex.size() > 6 ? uid_hex.substr(uid_hex.size() - 6) : uid_hex;
-    std::string fallback = "用户 " + short_id;
+    std::string fallback = T("用户 ") + short_id;
 
     if (uid_hex.size() < 32) return fallback;
 

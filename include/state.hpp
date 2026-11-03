@@ -33,6 +33,10 @@ public:
     void setLastSync(const std::string &value) { last_sync_ = value; }
     const std::string &lastSync() const { return last_sync_; }
 
+    const std::string &serverId() const { return server_id_; }
+    void setServerId(const std::string &value) { server_id_ = value; }
+    void clearIndexes();
+
 private:
     struct AlbumIndexEntry {
         u64 size = 0;
@@ -43,6 +47,7 @@ private:
     std::map<std::string, SaveIndexEntry> saves_;
     std::map<std::string, AlbumIndexEntry> album_;
     std::string last_sync_;
+    std::string server_id_;
 };
 
 std::string effectiveDeviceId(const Config &cfg, const State &state);

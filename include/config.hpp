@@ -31,6 +31,10 @@ struct Config {
     bool playtime_enabled = true;
     bool playtime_detailed = true;
 
+    // [app]
+    /// "auto" follows the system language, or "zh" / "en".
+    std::string language = "auto";
+
     bool load(std::string *err);
     bool writeDefault(std::string *err);
     bool save(std::string *err) const;

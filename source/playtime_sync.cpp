@@ -1,3 +1,4 @@
+#include "i18n.hpp"
 #include "playtime_sync.hpp"
 
 #include <cmath>
@@ -192,7 +193,7 @@ bool playLogCollect(TitleCache &titles, std::vector<PlayLogUser> *out, std::stri
     AccountUid uids[ACC_USER_LIST_SIZE];
     s32 user_count = 0;
     if (!ensureAccount()) {
-        if (err) *err = "account 服务不可用";
+        if (err) *err = T("account 服务不可用");
         return false;
     }
     Result rc = accountListAllUsers(uids, ACC_USER_LIST_SIZE, &user_count);
@@ -212,7 +213,7 @@ bool playLogCollect(TitleCache &titles, std::vector<PlayLogUser> *out, std::stri
     const std::vector<u64> &apps = titles.ids();
 
     // 1) Summaries for every installed application x user.
-    UI::progressPhase("读取游玩汇总", (int)apps.size());
+    UI::progressPhase(T("读取游玩汇总"), (int)apps.size());
     for (size_t a = 0; a < apps.size(); ++a) {
         if (!UI::pump()) {
             pdmqryExit();
@@ -243,7 +244,7 @@ bool playLogCollect(TitleCache &titles, std::vector<PlayLogUser> *out, std::stri
     }
 
     // 2) Detailed events from the system play log.
-    UI::progressPhase("读取详细事件", 0);
+    UI::progressPhase(T("读取详细事件"), 0);
     std::vector<RawEvent> events;
     std::string read_err;
     bool events_ok = readAllEvents(&events, &read_err);
@@ -392,8 +393,7 @@ bool playtimeSyncUpload(const Config &cfg, HttpClient &http, TitleCache &titles,
     u64 total_ns = 0;
     int row_count = 0;
     std::string body =
-        "#switchcloud-playtime v1\n"
-        "#title_id\tuser_id\tplaytime_ns\tlaunches\tlast_played\ttitle_name\n";
+        "#switchcloud-playtime v1\n" "#title_id\tuser_id\tplaytime_ns\tlaunches\tlast_played\ttitle_name\n";
     std::vector<std::pair<std::string, u64> > top;
 
     for (size_t u = 0; u < users.size(); ++u) {
@@ -424,7 +424,7 @@ bool playtimeSyncUpload(const Config &cfg, HttpClient &http, TitleCache &titles,
 
     const std::string device = effectiveDeviceId(cfg, state);
 
-    UI::progressPhase("上传游玩汇总", 1);
+    UI::progressPhase(T("上传游玩汇总"), 1);
     {
         std::string url = cfg.api("/playtime") + "?device=" + util::urlEncode(device);
         std::vector<std::string> headers;
@@ -444,7 +444,7 @@ bool playtimeSyncUpload(const Config &cfg, HttpClient &http, TitleCache &titles,
     }
 
     if (cfg.playtime_detailed) {
-        UI::progressPhase("上传详细记录", 1);
+        UI::progressPhase(T("上传详细记录"), 1);
         std::string json = playLogToJson(users, device);
         Log::printf("Detailed play log: %s, %u users",
                     util::formatBytes((long long)json.size()).c_str(), (unsigned)users.size());

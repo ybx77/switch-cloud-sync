@@ -61,6 +61,7 @@ struct RemoteSave {
 namespace util {
 
 std::string format(const char *fmt, ...);
+std::string format(const std::string &fmt, ...);
 std::string trim(const std::string &s);
 std::string toLower(std::string s);
 std::string toUpper(std::string s);

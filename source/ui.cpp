@@ -1,3 +1,4 @@
+#include "i18n.hpp"
 #include "ui.hpp"
 
 #include <cmath>
@@ -227,13 +228,13 @@ struct CardDef {
 
 std::vector<CardDef> homeCards() {
     std::vector<CardDef> cards;
-    cards.push_back({HomeAction::UploadAll, ICON_SYNC, "一键上传全部", "存档 · 相册 · 游玩记录"});
-    cards.push_back({HomeAction::UploadSaves, ICON_SAVE, "上传存档", "只传有变化的存档"});
-    cards.push_back({HomeAction::Restore, ICON_RESTORE, "恢复存档", "从服务器选择并写回"});
-    cards.push_back({HomeAction::UploadAlbum, ICON_ALBUM, "上传相册", "新增的截图与视频"});
-    cards.push_back({HomeAction::UploadPlaytime, ICON_CLOCK, "上传游玩记录", "汇总与详细事件"});
-    cards.push_back({HomeAction::Settings, ICON_GEAR, "设置", "服务器、令牌、同步选项"});
-    cards.push_back({HomeAction::Exit, ICON_POWER, "退出", "返回 hbmenu"});
+    cards.push_back({HomeAction::UploadAll, ICON_SYNC, T("一键上传全部"), T("存档 · 相册 · 游玩记录")});
+    cards.push_back({HomeAction::UploadSaves, ICON_SAVE, T("上传存档"), T("只传有变化的存档")});
+    cards.push_back({HomeAction::Restore, ICON_RESTORE, T("恢复存档"), T("从服务器选择并写回")});
+    cards.push_back({HomeAction::UploadAlbum, ICON_ALBUM, T("上传相册"), T("新增的截图与视频")});
+    cards.push_back({HomeAction::UploadPlaytime, ICON_CLOCK, T("上传游玩记录"), T("汇总与详细事件")});
+    cards.push_back({HomeAction::Settings, ICON_GEAR, T("设置"), T("服务器、令牌、同步选项")});
+    cards.push_back({HomeAction::Exit, ICON_POWER, T("退出"), T("返回 hbmenu")});
     return cards;
 }
 
@@ -300,7 +301,7 @@ void drawProgress() {
     drawBackground();
     Font::drawText(MARGIN, 34, g_prog.title, 34, C_TEXT);
     if (!g_prog.phase.empty()) {
-        Font::drawText(MARGIN, 84, "阶段: " + g_prog.phase, 18, C_MUTED);
+        Font::drawText(MARGIN, 84, T("阶段: ") + g_prog.phase, 18, C_MUTED);
     }
     Font::drawText(MARGIN, 150, Font::ellipsize(g_prog.label, 26, CONTENT_W - 140), 26, C_TEXT);
     Font::drawText(Gfx::W - MARGIN - 90, 150, util::format("%d%%", pct), 30, C_ACCENT);
@@ -331,7 +332,7 @@ void drawProgress() {
         ++shown;
     }
 
-    drawFooter({{"B", "取消"}});
+    drawFooter({{"B", T("取消")}});
     Gfx::end();
     g_prog.last_draw = Gfx::nowMs();
 }
@@ -361,7 +362,7 @@ void drawMessageScreen(const std::string &title, const std::vector<std::string> 
         Font::drawText(MARGIN + 108, y, Font::ellipsize(lines[i], 20, CONTENT_W - 140), 20, C_TEXT);
         y += 32;
     }
-    drawFooter({{"A", hint}, {"B", "返回"}});
+    drawFooter({{"A", hint}, {"B", T("返回")}});
     Gfx::end();
 }
 
@@ -373,7 +374,7 @@ bool init(std::string *err) {
     if (!Gfx::init(err)) return false;
     std::string font_err;
     if (!Font::init(&font_err)) {
-        Log::printf("字体初始化失败: %s", font_err.c_str());
+        Log::printf(T("字体初始化失败: %s"), font_err.c_str());
     }
     return true;
 }
@@ -412,9 +413,9 @@ HomeAction home(const Config &cfg, const State &state, const ServerStatus &statu
         Gfx::begin();
         drawBackground();
         drawHeader(APP_NAME " " APP_VERSION,
-                   cfg.ready() ? cfg.base_url : "还没有配置服务器地址", status);
+                   cfg.ready() ? cfg.base_url : T("还没有配置服务器地址"), status);
 
-        std::string counts = util::format("设备 %s   ·   已记录 %u 个存档索引 / %u 个相册索引",
+        std::string counts = util::format(T("设备 %s   ·   已记录 %u 个存档索引 / %u 个相册索引"),
                                           effectiveDeviceId(cfg, state).c_str(),
                                           (unsigned)state.saveCount(),
                                           (unsigned)state.albumCount());
@@ -427,7 +428,7 @@ HomeAction home(const Config &cfg, const State &state, const ServerStatus &statu
                      i == 0);
         }
 
-        drawFooter({{"A", "选择"}, {"方向键", "移动"}, {"B", "退出"}});
+        drawFooter({{"A", T("选择")}, {T("方向键"), T("移动")}, {"B", T("退出")}});
         Gfx::end();
         svcSleepThread(16000000ULL);
     }
@@ -436,6 +437,7 @@ HomeAction home(const Config &cfg, const State &state, const ServerStatus &statu
 namespace {
 
 enum FieldId {
+    F_LANG,
     F_URL,
     F_TOKEN,
     F_DEVNAME,
@@ -465,11 +467,11 @@ struct SetRow {
     bool on = false;
 };
 
-const char *onOff(bool v) { return v ? "开启" : "关闭"; }
+std::string onOff(bool v) { return v ? T("开启") : T("关闭"); }
 
 std::string maskToken(const std::string &token) {
-    if (token.empty()) return "未设置";
-    if (token.size() <= 4) return "已设置";
+    if (token.empty()) return T("未设置");
+    if (token.size() <= 4) return T("已设置");
     return token.substr(0, 2) + "…" + token.substr(token.size() - 2);
 }
 
@@ -477,124 +479,132 @@ std::vector<SetRow> buildRows(const Config &cfg) {
     std::vector<SetRow> rows;
     SetRow r;
 
-    r.label = "服务器地址";
-    r.value = cfg.base_url.empty() ? "未设置" : cfg.base_url;
+    r.kind = 4;
+    r.label = T("语言");
+    r.id = F_LANG;
+    r.value = cfg.language == "zh" ? T("中文")
+                                    : (cfg.language == "en" ? std::string("English")
+                                                             : T("自动"));
+    rows.push_back(r);
+
+    r.label = T("服务器地址");
+    r.value = cfg.base_url.empty() ? T("未设置") : cfg.base_url;
     r.kind = 0;
     r.id = F_URL;
     rows.push_back(r);
 
-    r.label = "访问令牌";
+    r.label = T("访问令牌");
     r.value = maskToken(cfg.token);
     r.id = F_TOKEN;
     rows.push_back(r);
 
-    r.label = "设备名称";
-    r.value = cfg.device_name.empty() ? "未设置" : cfg.device_name;
+    r.label = T("设备名称");
+    r.value = cfg.device_name.empty() ? T("未设置") : cfg.device_name;
     r.id = F_DEVNAME;
     rows.push_back(r);
 
-    r.label = "设备 ID";
-    r.value = cfg.device_id_config.empty() ? "自动生成" : cfg.device_id_config;
+    r.label = T("设备 ID");
+    r.value = cfg.device_id_config.empty() ? T("自动生成") : cfg.device_id_config;
     r.id = F_DEVID;
     rows.push_back(r);
 
-    r.label = "CA 证书路径";
-    r.value = cfg.ca_bundle.empty() ? "自动检测" : cfg.ca_bundle;
+    r.label = T("CA 证书路径");
+    r.value = cfg.ca_bundle.empty() ? T("自动检测") : cfg.ca_bundle;
     r.id = F_CABUNDLE;
     rows.push_back(r);
 
-    r.label = "网络超时（秒）";
+    r.label = T("网络超时（秒）");
     r.value = util::format("%ld", cfg.timeout_sec);
     r.kind = 1;
     r.id = F_TIMEOUT;
     rows.push_back(r);
 
-    r.label = "单个存档上限（MB）";
+    r.label = T("单个存档上限（MB）");
     r.value = util::format("%ld", cfg.max_upload_mb);
     r.id = F_MAXMB;
     rows.push_back(r);
 
     r.kind = 2;
-    r.label = "上传存档";
+    r.label = T("上传存档");
     r.on = cfg.saves_enabled;
     r.value = onOff(cfg.saves_enabled);
     r.id = F_SAVES;
     rows.push_back(r);
 
-    r.label = "只上传有变化的内容";
+    r.label = T("只上传有变化的内容");
     r.on = cfg.only_changed;
     r.value = onOff(cfg.only_changed);
     r.id = F_ONLYCHANGED;
     rows.push_back(r);
 
-    r.label = "仅游戏存档（跳过系统）";
+    r.label = T("仅游戏存档（跳过系统）");
     r.on = cfg.games_only;
     r.value = onOff(cfg.games_only);
     r.id = F_GAMESONLY;
     rows.push_back(r);
 
-    r.label = "上传相册";
+    r.label = T("上传相册");
     r.on = cfg.album_enabled;
     r.value = onOff(cfg.album_enabled);
     r.id = F_ALBUM;
     rows.push_back(r);
 
-    r.label = "上传后删除本地相册";
+    r.label = T("上传后删除本地相册");
     r.on = cfg.album_delete_after_upload;
     r.value = onOff(cfg.album_delete_after_upload);
     r.id = F_ALBUMDEL;
     rows.push_back(r);
 
-    r.label = "上传游玩记录";
+    r.label = T("上传游玩记录");
     r.on = cfg.playtime_enabled;
     r.value = onOff(cfg.playtime_enabled);
     r.id = F_PLAYTIME;
     rows.push_back(r);
 
-    r.label = "详细游玩事件";
+    r.label = T("详细游玩事件");
     r.on = cfg.playtime_detailed;
     r.value = onOff(cfg.playtime_detailed);
     r.id = F_DETAILED;
     rows.push_back(r);
 
-    r.label = "跳过 TLS 校验（内网）";
+    r.label = T("跳过 TLS 校验（内网）");
     r.on = cfg.insecure_tls;
     r.value = onOff(cfg.insecure_tls);
     r.id = F_INSECURE;
     rows.push_back(r);
 
     r.kind = 3;
-    r.label = "测试服务器连接";
-    r.value = "执行";
+    r.label = T("测试服务器连接");
+    r.value = T("执行");
     r.id = F_TEST;
     rows.push_back(r);
 
-    r.label = "保存设置";
-    r.value = "保存";
+    r.label = T("保存设置");
+    r.value = T("保存");
     r.id = F_SAVE;
     rows.push_back(r);
 
-    r.label = "重新读取配置文件";
-    r.value = "重新读取";
+    r.label = T("重新读取配置文件");
+    r.value = T("重新读取");
     r.id = F_RELOAD;
     rows.push_back(r);
 
-    r.label = "返回";
+    r.label = T("返回");
     r.value = "";
     r.id = F_BACK;
     rows.push_back(r);
     return rows;
 }
 
-bool editText(const char *header, const char *guide, const std::string &initial, bool numeric,
-              std::string *out) {
+bool editText(const std::string &header, const std::string &guide, const std::string &initial,
+              bool numeric, std::string *out) {
     SwkbdConfig kbd;
     if (R_FAILED(swkbdCreate(&kbd, 0))) return false;
 
     swkbdConfigMakePresetDefault(&kbd);
     swkbdConfigSetType(&kbd, numeric ? SwkbdType_NumPad : SwkbdType_Normal);
-    swkbdConfigSetHeaderText(&kbd, header);
-    swkbdConfigSetGuideText(&kbd, guide);
+    swkbdConfigSetHeaderText(&kbd, header.c_str());
+    swkbdConfigSetGuideText(&kbd, guide.c_str());
     swkbdConfigSetInitialText(&kbd, initial.c_str());
     swkbdConfigSetStringLenMax(&kbd, numeric ? 8 : 512);
     swkbdConfigSetBlurBackground(&kbd, 1);
@@ -620,8 +630,8 @@ void drawSettings(const Config &cfg, const std::vector<SetRow> &rows, int sel, i
     (void)cfg;
     Gfx::begin();
     drawBackground();
-    Font::drawText(MARGIN, 34, "设置", 34, C_TEXT);
-    Font::drawText(MARGIN, 84, "所有参数都会写回 sdmc:/switch/cloud-sync/config.ini", 17, C_MUTED);
+    Font::drawText(MARGIN, 34, T("设置"), 34, C_TEXT);
+    Font::drawText(MARGIN, 84, T("所有参数都会写回 sdmc:/switch/cloud-sync/config.ini"), 17, C_MUTED);
 
     const int row_h = 52;
     const int visible = 9;
@@ -645,7 +655,7 @@ void drawSettings(const Config &cfg, const std::vector<SetRow> &rows, int sel, i
             std::string value = Font::ellipsize(rows[i].value, 18, CONTENT_W / 2);
             int w = Font::measure(value, 18);
             Font::drawText(MARGIN + CONTENT_W - 28 - w, y + 10, value, 18,
-                           rows[i].kind == 3 ? C_ACCENT : C_TEXT);
+                           (rows[i].kind == 3 || rows[i].kind == 4) ? C_ACCENT : C_TEXT);
         }
     }
 
@@ -655,7 +665,7 @@ void drawSettings(const Config &cfg, const std::vector<SetRow> &rows, int sel, i
         Font::drawText(MARGIN + 20, 128 + visible * row_h + 28, toast, 17, C_ACCENT2);
     }
 
-    drawFooter({{"A", "编辑 / 切换"}, {"X", "保存"}, {"Y", "重读"}, {"B", "返回"}});
+    drawFooter({{"A", T("编辑 / 切换")}, {"X", T("保存")}, {"Y", T("重读")}, {"B", T("返回")}});
     Gfx::end();
 }
 
@@ -666,7 +676,7 @@ void refreshStatus(const Config &cfg, ServerStatus *status) {
     status->configured = cfg.ready();
     status->checked = false;
     status->ok = false;
-    status->text = status->configured ? "已配置" : "未配置";
+    status->text = status->configured ? T("已配置") : T("未配置");
 }
 
 bool settings(Config &cfg, const State &state, ServerStatus *status, std::string *err) {
@@ -707,9 +717,19 @@ bool settings(Config &cfg, const State &state, ServerStatus *status, std::string
         if (activate) {
             SetRow &row = rows[sel];
             switch (row.id) {
+                case F_LANG:
+                    if (cfg.language == "auto") {
+                        cfg.language = "zh";
+                    } else if (cfg.language == "zh") {
+                        cfg.language = "en";
+                    } else {
+                        cfg.language = "auto";
+                    }
+                    i18nInit(cfg.language);
+                    break;
                 case F_URL: {
                     std::string value;
-                    if (editText("服务器地址", "例如 https://cloud.example.com", cfg.base_url, false,
+                    if (editText(T("服务器地址"), T("例如 https://cloud.example.com"), cfg.base_url, false,
                                  &value)) {
                         cfg.base_url = util::trim(value);
                         while (!cfg.base_url.empty() &&
@@ -721,28 +741,28 @@ bool settings(Config &cfg, const State &state, ServerStatus *status, std::string
                 }
                 case F_TOKEN: {
                     std::string value;
-                    if (editText("访问令牌", "留空表示不发送 Authorization", cfg.token, false, &value)) {
+                    if (editText(T("访问令牌"), T("留空表示不发送 Authorization"), cfg.token, false, &value)) {
                         cfg.token = util::trim(value);
                     }
                     break;
                 }
                 case F_DEVNAME: {
                     std::string value;
-                    if (editText("设备名称", "显示在服务器端", cfg.device_name, false, &value)) {
+                    if (editText(T("设备名称"), T("显示在服务器端"), cfg.device_name, false, &value)) {
                         cfg.device_name = util::trim(value);
                     }
                     break;
                 }
                 case F_DEVID: {
                     std::string value;
-                    if (editText("设备 ID", "留空则自动生成", cfg.device_id_config, false, &value)) {
+                    if (editText(T("设备 ID"), T("留空则自动生成"), cfg.device_id_config, false, &value)) {
                         cfg.device_id_config = util::trim(value);
                     }
                     break;
                 }
                 case F_CABUNDLE: {
                     std::string value;
-                    if (editText("CA 证书路径", "留空则自动使用 ca-bundle.pem", cfg.ca_bundle, false,
+                    if (editText(T("CA 证书路径"), T("留空则自动使用 ca-bundle.pem"), cfg.ca_bundle, false,
                                  &value)) {
                         cfg.ca_bundle = util::trim(value);
                     }
@@ -750,7 +770,7 @@ bool settings(Config &cfg, const State &state, ServerStatus *status, std::string
                 }
                 case F_TIMEOUT: {
                     std::string value;
-                    if (editText("网络超时（秒）", "5 - 3600", util::format("%ld", cfg.timeout_sec),
+                    if (editText(T("网络超时（秒）"), "5 - 3600", util::format("%ld", cfg.timeout_sec),
                                  true, &value)) {
                         long v = atol(value.c_str());
                         if (v < 5) v = 5;
@@ -761,7 +781,7 @@ bool settings(Config &cfg, const State &state, ServerStatus *status, std::string
                 }
                 case F_MAXMB: {
                     std::string value;
-                    if (editText("单个存档上限（MB）", "1 - 4096",
+                    if (editText(T("单个存档上限（MB）"), "1 - 4096",
                                  util::format("%ld", cfg.max_upload_mb), true, &value)) {
                         long v = atol(value.c_str());
                         if (v < 1) v = 1;
@@ -796,33 +816,33 @@ bool settings(Config &cfg, const State &state, ServerStatus *status, std::string
                     break;
                 case F_TEST: {
                     if (!cfg.ready()) {
-                        toast = "请先填写服务器地址";
+                        toast = T("请先填写服务器地址");
                     } else {
-                        progressBegin("测试服务器连接", 1);
-                        progressStep(1, "正在连接 " + cfg.base_url);
+                        progressBegin(T("测试服务器连接"), 1);
+                        progressStep(1, T("正在连接 ") + cfg.base_url);
                         HttpClient tmp;
                         std::string http_err;
                         if (!tmp.init(cfg, &http_err)) {
-                            toast = "初始化失败: " + http_err;
+                            toast = T("初始化失败: ") + http_err;
                         } else {
                             HttpResponse resp;
                             if (tmp.getText(cfg.api("/ping"), &resp, &http_err)) {
-                                toast = util::format("连接成功 HTTP %ld", resp.status);
+                                toast = util::format(T("连接成功 HTTP %ld"), resp.status);
                                 if (status) {
                                     status->configured = true;
                                     status->checked = true;
                                     status->ok = (resp.status == 200);
                                     status->text = status->ok
-                                                       ? "已连接"
+                                                       ? T("已连接")
                                                        : util::format("HTTP %ld", resp.status);
                                 }
                             } else {
-                                toast = "连接失败: " + http_err;
+                                toast = T("连接失败: ") + http_err;
                                 if (status) {
                                     status->configured = true;
                                     status->checked = true;
                                     status->ok = false;
-                                    status->text = "连接失败";
+                                    status->text = T("连接失败");
                                 }
                             }
                         }
@@ -848,22 +868,24 @@ bool settings(Config &cfg, const State &state, ServerStatus *status, std::string
             std::string save_err;
             if (cfg.save(&save_err)) {
                 saved = true;
-                toast = "设置已保存";
+                toast = T("设置已保存");
             } else {
-                toast = "保存失败: " + save_err;
+                toast = T("保存失败: ") + save_err;
             }
             refreshStatus(cfg, status);
+            i18nInit(cfg.language);
             toast_until = Gfx::nowMs() + 4000;
         }
 
         if (do_reload) {
             std::string load_err;
             if (cfg.load(&load_err)) {
-                toast = "已重新读取配置";
+                toast = T("已重新读取配置");
             } else {
                 toast = load_err;
             }
             refreshStatus(cfg, status);
+            i18nInit(cfg.language);
             toast_until = Gfx::nowMs() + 4000;
         }
 
@@ -880,7 +902,7 @@ void message(const std::string &title, const std::vector<std::string> &lines, bo
     g_abort = false;
     int scroll = 0;
     for (;;) {
-        drawMessageScreen(title, lines, scroll, error, "返回");
+        drawMessageScreen(title, lines, scroll, error, T("返回"));
         if (!appletMainLoop()) {
             g_exit = true;
             return;
@@ -910,7 +932,7 @@ bool confirm(const std::string &title, const std::vector<std::string> &lines) {
                            C_TEXT);
             y += 34;
         }
-        drawFooter({{"A", "确认"}, {"B", "取消"}});
+        drawFooter({{"A", T("确认")}, {"B", T("取消")}});
         Gfx::end();
 
         if (!appletMainLoop()) {
@@ -937,8 +959,8 @@ int selectRemote(const std::vector<RemoteSave> &saves, const std::string &subtit
 
         Gfx::begin();
         drawBackground();
-        Font::drawText(MARGIN, 34, "恢复存档", 34, C_TEXT);
-        Font::drawText(MARGIN, 84, util::format("%s   ·   共 %u 份", subtitle.c_str(),
+        Font::drawText(MARGIN, 34, T("恢复存档"), 34, C_TEXT);
+        Font::drawText(MARGIN, 84, util::format(T("%s   ·   共 %u 份"), subtitle.c_str(),
                                                 (unsigned)saves.size()),
                        17, C_MUTED);
 
@@ -951,7 +973,7 @@ int selectRemote(const std::vector<RemoteSave> &saves, const std::string &subtit
                 Gfx::fillRoundRect(MARGIN + 8, y - 4, 4, 60, 2, C_ACCENT);
             }
             const RemoteSave &s = saves[i];
-            std::string name = s.title_name.empty() ? "未知游戏" : s.title_name;
+            std::string name = s.title_name.empty() ? T("未知游戏") : s.title_name;
             Font::drawText(MARGIN + 28, y + 4, Font::ellipsize(name, 22, CONTENT_W - 300), 22,
                            C_TEXT);
             std::string meta = util::format("%s   ·   %s   ·   %s   ·   %s",
@@ -960,7 +982,7 @@ int selectRemote(const std::vector<RemoteSave> &saves, const std::string &subtit
                                             util::formatUnixTime(s.timestamp).c_str());
             Font::drawText(MARGIN + 28, y + 32, meta, 15, C_MUTED);
         }
-        drawFooter({{"A", "选择"}, {"B", "返回"}});
+        drawFooter({{"A", T("选择")}, {"B", T("返回")}});
         Gfx::end();
 
         if (!appletMainLoop()) {
@@ -979,7 +1001,7 @@ int selectRemote(const std::vector<RemoteSave> &saves, const std::string &subtit
 
 void result(const std::string &title, const std::vector<std::string> &lines, bool ok) {
     g_abort = false;
-    drawMessageScreen(title, lines, 0, !ok, "返回");
+    drawMessageScreen(title, lines, 0, !ok, T("返回"));
     for (;;) {
         if (!appletMainLoop()) {
             g_exit = true;
@@ -997,7 +1019,7 @@ void progressBegin(const std::string &title, int total) {
     g_prog.active = true;
     g_prog.title = title;
     g_prog.total = total;
-    g_prog.label = "准备中…";
+    g_prog.label = T("准备中…");
     g_abort = false;
     drawProgress();
 }

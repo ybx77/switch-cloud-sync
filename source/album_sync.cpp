@@ -1,6 +1,8 @@
+#include "i18n.hpp"
 #include "album_sync.hpp"
 
 #include "log.hpp"
+#include "server_identity.hpp"
 #include "state.hpp"
 #include "ui.hpp"
 
@@ -38,14 +40,14 @@ bool openAlbum(AlbumRoot *root, std::string *err) {
     if (R_SUCCEEDED(rc)) {
         root->open = true;
         root->prefix.clear();
-        Log::printf("相册: ImageDirectory 挂载成功");
+        Log::printf(T("相册: ImageDirectory 挂载成功"));
         return true;
     }
-    Log::printf("ImageDirectory 挂载失败 (0x%x)，改用 sdmc", rc);
+    Log::printf(T("ImageDirectory 挂载失败 (0x%x)，改用 sdmc"), rc);
 
     rc = fsOpenSdCardFileSystem(&root->fs);
     if (R_FAILED(rc)) {
-        if (err) *err = util::format("无法打开 SD 卡文件系统 (0x%x)", rc);
+        if (err) *err = util::format(T("无法打开 SD 卡文件系统 (0x%x)"), rc);
         return false;
     }
 
@@ -54,13 +56,13 @@ bool openAlbum(AlbumRoot *root, std::string *err) {
     rc = fsFsGetEntryType(&root->fs, album_root.c_str(), &type);
     if (R_FAILED(rc) || type != FsDirEntryType_Dir) {
         fsFsClose(&root->fs);
-        if (err) *err = util::format("找不到 sdmc:/%s", kAlbumSdmcPath);
+        if (err) *err = util::format(T("找不到 sdmc:/%s"), kAlbumSdmcPath);
         return false;
     }
 
     root->open = true;
     root->prefix = kAlbumSdmcPath;
-    Log::printf("相册: sdmc:/%s", kAlbumSdmcPath);
+    Log::printf(T("相册: sdmc:/%s"), kAlbumSdmcPath);
     return true;
 }
 
@@ -90,7 +92,7 @@ void walkAlbum(FsFileSystem *fs, const std::string &prefix, const std::string &r
     Result rc = fsFsOpenDirectory(fs, dir_path.c_str(),
                                  FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, &dir);
     if (R_FAILED(rc)) {
-        Log::printf("  跳过 %s (0x%x)", dir_path.c_str(), rc);
+        Log::printf(T("  跳过 %s (0x%x)"), dir_path.c_str(), rc);
         return;
     }
 
@@ -173,12 +175,14 @@ bool albumSyncUpload(const Config &cfg, HttpClient &http, State &state, SyncStat
                      std::string *err) {
     *stats = SyncStats();
     if (!cfg.album_enabled) {
-        if (err) *err = "设置里已关闭相册上传";
+        if (err) *err = T("设置里已关闭相册上传");
         return false;
     }
 
     AlbumRoot root;
     if (!openAlbum(&root, err)) return false;
+
+    syncServerIdentity(cfg, http, state);
 
     std::vector<AlbumFile> files;
     walkAlbum(&root.fs, root.prefix, std::string(), &files, 0);
@@ -186,19 +190,19 @@ bool albumSyncUpload(const Config &cfg, HttpClient &http, State &state, SyncStat
               [](const AlbumFile &a, const AlbumFile &b) { return a.path < b.path; });
 
     stats->total = (int)files.size();
-    Log::printf("找到 %u 个相册文件", (unsigned)files.size());
+    Log::printf(T("找到 %u 个相册文件"), (unsigned)files.size());
     if (files.empty()) {
         closeAlbum(&root);
         return true;
     }
 
-    UI::progressPhase("相册上传", (int)files.size());
+    UI::progressPhase(T("相册上传"), (int)files.size());
     const std::string device = effectiveDeviceId(cfg, state);
 
     for (size_t i = 0; i < files.size(); ++i) {
         if (!UI::pump()) {
             closeAlbum(&root);
-            if (err) *err = "已取消";
+            if (err) *err = T("已取消");
             return false;
         }
 
@@ -216,7 +220,7 @@ bool albumSyncUpload(const Config &cfg, HttpClient &http, State &state, SyncStat
 
         FsFileUploadSource src(&root.fs, full);
         if (!src.ok()) {
-            Log::printf("  失败：无法打开文件");
+            Log::printf(T("  失败：无法打开文件"));
             ++stats->failed;
             continue;
         }
@@ -233,13 +237,13 @@ bool albumSyncUpload(const Config &cfg, HttpClient &http, State &state, SyncStat
         bool ok = http.put(url, &src, contentTypeFor(file.path), headers, &resp, &http_err);
 
         if (!ok) {
-            Log::printf("  失败: %s", http_err.c_str());
+            Log::printf(T("  失败: %s"), http_err.c_str());
             ++stats->failed;
             if (g_abort || g_exit) break;
             continue;
         }
         if (resp.status < 200 || resp.status >= 300) {
-            Log::printf("  失败: HTTP %ld", resp.status);
+            Log::printf(T("  失败: HTTP %ld"), resp.status);
             ++stats->failed;
             continue;
         }
@@ -249,13 +253,13 @@ bool albumSyncUpload(const Config &cfg, HttpClient &http, State &state, SyncStat
 
         if (cfg.album_delete_after_upload) {
             Result rc = fsFsDeleteFile(&root.fs, full.c_str());
-            if (R_FAILED(rc)) Log::printf("  已上传，但删除本地文件失败 (0x%x)", rc);
+            if (R_FAILED(rc)) Log::printf(T("  已上传，但删除本地文件失败 (0x%x)"), rc);
         }
 
         if (stats->uploaded % 50 == 0) state.flush();
     }
 
-    state.setLastSync(util::format("相册 %s", util::formatUnixTime(util::nowUnix()).c_str()));
+    state.setLastSync(util::format(T("相册 %s"), util::formatUnixTime(util::nowUnix()).c_str()));
     state.flush();
     closeAlbum(&root);
     return !(g_abort || g_exit);

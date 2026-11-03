@@ -9,6 +9,7 @@ void close();
 
 /// Appends to the SD log and to an in-memory ring buffer shown on the progress screen.
 void printf(const char *fmt, ...);
+void printf(const std::string &fmt, ...);
 const std::deque<std::string> &recent();
 void clearRecent();
 
